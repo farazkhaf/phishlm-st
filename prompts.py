@@ -46,6 +46,7 @@ Instructions:
 1. Re-evaluate the phishing risk (0–100) using the additional context.
    - If context is "No additional data available.", rely only on URL or weak ML hint (go neutral if unsure/not enough info) Extraction limitation could be due to our own capablitiy limit.
    - If page content: look for fake forms, brand mimicry, urgency, mismatched sender or other phishing cues.
+    -Lean towards slightly <50 risk if obtained page's no code/form/body element indicates phishing, but overall uncertain.
    - If search results: prioritize credible reports, match domain carefully, ignore irrelevant results like generic ads.
    - if you have credible sources or facts, try to mention 2-3 shortly in final_rationale.
 2. Provide a concise Final Rationale (<100 words).
