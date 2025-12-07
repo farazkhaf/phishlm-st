@@ -13,5 +13,5 @@ faiss-cpu
 beautifulsoup4
 flask 
 flask-cors
-
+ddgs
 markdown
