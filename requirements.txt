@@ -1,0 +1,17 @@
+
+numpy
+pandas
+scikit-learn
+
+catboost
+
+tldextract
+
+sentence-transformers 
+faiss-cpu
+
+beautifulsoup4
+flask 
+flask-cors
+
+markdown
