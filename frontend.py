@@ -1,103 +1,113 @@
-
 import streamlit as st
 import time
 from typing import Dict, Any
 import analysis
 import tldextract
-import markdown
+import re
 
 st.set_page_config(
     page_title="PhishLM Analyzer",
-    page_icon="🛡️",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# Clean, minimal styling
 st.markdown("""
 <style>
-    [data-testid="stSidebar"] {
-        min-width: 400px;
-        max-width: 450px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
+    /* Base responsive design */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    :root {
+        --primary: #6366f1;
+        --success: #059669;
+        --warning: #d97706;
+        --error: #dc2626;
+        --info: #3b82f6;
+        --suspicious: #f97316;
+    }
     
     body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
+    @media (min-width: 769px) {
+        [data-testid="stSidebar"] {
+            transform: translateX(0) !important;  /* Show sidebar on desktop */
+        }
+    }
+    /* Mobile-first responsive sidebar */
+    @media (max-width: 768px) {
+        [data-testid="stSidebar"] {
+            min-width: 100vw !important;
+            max-width: 100vw !important;
+            transform: translateX(-100%);
+            transition: transform 300ms ease-in-out;
+            z-index: 999;
+        }
+        
+        [data-testid="stSidebar"][aria-expanded="true"] {
+            transform: translateX(0);
+        }
+        
+        .main .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+            display: none;
+        }
+        
+        [data-testid="stSidebar"][aria-expanded="true"] ~ .mobile-overlay {
+            display: block;
+        }
+    }
     
-    .main-header {
-        font-size: 2.8rem;
-        font-weight: 700;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 0.8rem;
-        letter-spacing: -0.02em;
+    /* Desktop sidebar */
+    [data-testid="stSidebar"] {
+        min-width: 350px;
+        max-width: 400px;
     }
-    .sub-header {
-        font-size: 1.2rem;
-        color: #6b7280;
-        margin-bottom: 2rem;
-        line-height: 1.6;
-    }
-    .final-card {
-        background: linear-gradient(135deg, #f0f9ff, #fdf2f8);
-        border-radius: 16px;
-        padding: 2.5rem;
-        border: 1px solid #e0e7ff;
-        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.1);
-        backdrop-filter: blur(10px);
-    }
-    .status-badge {
-        display: inline-block;
-        padding: 0.3rem 0.9rem;
-        border-radius: 24px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        margin-right: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.025em;
-    }
-    .metric-value {
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #4f46e5;
-        line-height: 1.4;
-    }
-    .success {
-        color: #059669;
-        background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-        border: 1px solid #a7f3d0;
-    }
-    .warning {
-        color: #d97706;
-        background: linear-gradient(135deg, #fef3c7, #fde68a);
-        border: 1px solid #fde68a;
-    }
-    .error {
-        color: #dc2626;
-        background: linear-gradient(135deg, #fee2e2, #fecaca);
-        border: 1px solid #fecaca;
-    }
-    .info {
-        color: #3b82f6;
-        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-        border: 1px solid #bfdbfe;
-    }
-    .suspicious {
-        color: #f97316;
-        background: linear-gradient(135deg, #ffedd5, #fed7aa);
-        border: 1px solid #fed7aa;
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #6366f1, #8b5cf6);
     }
 </style>
 """, unsafe_allow_html=True)
+
+def sanitize_html(text: str) -> str:
+    """Sanitize HTML by escaping dangerous tags and preserving safe formatting."""
+    if not text:
+        return ""
+    
+    # Remove script tags and event handlers
+    text = re.sub(r'<script.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'on\w+="[^"]*"', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'on\w+=\'[^\']*\'', '', text, flags=re.IGNORECASE)
+    
+    # Escape remaining HTML but preserve line breaks
+    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    
+    # Convert markdown-like formatting to HTML
+    text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'\*(.*?)\*', r'<em>\1</em>', text)
+    
+    # Preserve line breaks
+    text = text.replace('\n', '<br>')
+    
+    return text
 
 def is_valid_domain(url: str) -> bool:
     """Check if the URL has a valid domain structure using tldextract."""
@@ -115,69 +125,87 @@ def is_valid_domain(url: str) -> bool:
         return False
 
 def display_status_badge(status: str, text: str):
-    """Display a status badge with appropriate color."""
-    color_class = {
-        "success": "safe",
-        "warning": "warning",
-        "error": "risk",
-        "info": "info",
-        "suspicious": "suspicious"
-    }.get(status, "info")
+    """Display a clean status badge without emojis."""
+    color_map = {
+        "success": ("#059669", "#d1fae5"),
+        "warning": ("#d97706", "#fef3c7"),
+        "error": ("#dc2626", "#fee2e2"),
+        "info": ("#3b82f6", "#dbeafe"),
+        "suspicious": ("#f97316", "#ffedd5")
+    }
     
-    st.markdown(f'<span class="status-badge {color_class}">{text}</span>', unsafe_allow_html=True)
+    color, bg_color = color_map.get(status, ("#3b82f6", "#dbeafe"))
+    
+    st.markdown(f"""
+    <div style="
+        display: inline-flex;
+        align-items: center;
+        background: {bg_color};
+        color: {color};
+        border: 1px solid {color}20;
+        border-radius: 16px;
+        padding: 4px 12px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-right: 8px;
+        margin-bottom: 8px;
+    ">
+        {text}
+    </div>
+    """, unsafe_allow_html=True)
 
 def display_progress_bar(progress_placeholder, current_stage: int, total_stages: int, stage_description: str):
     """Display progress bar with current stage description."""
     progress = current_stage / total_stages
-
+    
     progress_placeholder.empty()
     with progress_placeholder.container():
         st.progress(progress)
-        st.markdown(
-            f'<p style="text-align: center; margin-top: 0.5rem; color: #6b7280; font-weight: 500;"><strong>{stage_description}</strong></p>',
-            unsafe_allow_html=True
-        )
+        st.caption(f"{stage_description}")
 
 def hide_progress_bar(progress_placeholder):
     """Clear the progress bar placeholder."""
     progress_placeholder.empty()
 
 def display_metric_card(title: str, value: Any, description: str = "", status: str = "info"):
-    """Display a metric card in the sidebar."""
-    badge_html = ""
-    if status:
-        color_class = {
-            "success": "success",
-            "warning": "warning",
-            "error": "error",
-            "info": "info",
-            "suspicious": "suspicious"
-        }.get(status, "info")
-        badge_html = f'<span class="status-badge {color_class}">{status.upper()}</span>'
-    
-    html = f"""
-    <div style="
-        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-        border-radius: 14px;
-        padding: 1.5rem;
-        margin-bottom: 1.2rem;
-        border-left: 4px solid #6366f1;
-        box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.1);
-        backdrop-filter: blur(10px);
-    ">
-        <h4 style="margin-top: 0; margin-bottom: 0.6rem; color: #374151; font-weight: 600; font-size: 1.1rem;">{title}</h4>
-        <p class="metric-value">{value}</p>
-    """
-    
-    if description:
-        html += f'<p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 0.6rem; line-height: 1.5;">{description}</p>'
-    
-    if badge_html:
-        html += f'<p style="margin-bottom: 0;">{badge_html}</p>'
-    
-    html += '</div>'
-    
-    st.markdown(html, unsafe_allow_html=True)
+    """Display a clean metric card without icons."""
+    with st.container():
+        container = st.container()
+        
+        with container:
+            # Create a simple, clean layout
+            st.markdown(f"**{title}**")
+            
+            if isinstance(value, (int, float)):
+                # Determine color based on value for risk scores
+                if isinstance(value, int) and value >= 70:
+                    value_color = "#dc2626"
+                elif isinstance(value, int) and value >= 30:
+                    value_color = "#d97706"
+                else:
+                    value_color = "#4f46e5"
+                    
+                st.markdown(f'<h3 style="margin: 0; color: {value_color};">{value}</h3>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<h3 style="margin: 0; color: #4f46e5;">{value}</h3>', unsafe_allow_html=True)
+            
+            if description:
+                st.caption(description)
+            
+            # Simple status indicator
+            if status:
+                status_colors = {
+                    "success": "#059669",
+                    "warning": "#d97706",
+                    "error": "#dc2626",
+                    "info": "#3b82f6",
+                    "suspicious": "#f97316"
+                }
+                color = status_colors.get(status, "#3b82f6")
+                st.markdown(f'<div style="height: 2px; background: {color}; width: 40px; margin-top: 8px;"></div>', unsafe_allow_html=True)
+        
+        # Add subtle separator
+        st.markdown('<hr style="margin: 8px 0; border: none; height: 1px; background: #e5e7eb;">', unsafe_allow_html=True)
 
 def retrieve_content_based_on_option(retrieve_option: str, url: str, progress_placeholder, base_stage: int, total_stages: int):
     """Handle different retrieval options and return content with appropriate progress tracking."""
@@ -209,123 +237,113 @@ def retrieve_content_based_on_option(retrieve_option: str, url: str, progress_pl
         return "No additional data available", "Unknown", base_stage
 
 def display_final_result(result: Dict[str, Any]):
-    """Display the final analysis result."""
-    col1, col2 = st.columns([2, 1])
+    """Display the final analysis result with clean, professional styling."""
+    
+    # Main result header
+    st.markdown("### Final Assessment")
+    
+    # Prediction with clean styling
+    if result["prediction"] == "PHISHING":
+        st.markdown(
+            '<div style="background: linear-gradient(135deg, #fef2f2, #fee2e2); padding: 1.5rem; border-radius: 8px; border-left: 4px solid #dc2626; margin-bottom: 2rem;">'
+            '<h3 style="margin: 0; color: #991b1b;">PHISHING SITE DETECTED</h3>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            '<div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); padding: 1.5rem; border-radius: 8px; border-left: 4px solid #059669; margin-bottom: 2rem;">'
+            '<h3 style="margin: 0; color: #166534;">LEGITIMATE SITE</h3>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+    
+    # Create two columns for layout
+    col1, col2 = st.columns([2, 1], gap="large")
     
     with col1:
-        html = """
-        <div style="
-            background: linear-gradient(135deg, #f0f9ff, #fdf2f8);
-            border-radius: 16px;
-            padding: 2.5rem;
-            border: 1px solid #e0e7ff;
-            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.1);
-            backdrop-filter: blur(10px);
-        ">
-        """
-        
-        # Prediction
-        if result["prediction"] == "PHISHING":
-            html += '<div style="color: #dc2626; font-size: 1.6rem; font-weight: 700; margin-bottom: 1.2rem; text-align: center; background: linear-gradient(135deg, #fee2e2, #fecaca); padding: 1rem; border-radius: 12px; border: 1px solid #fecaca;">PHISHING SITE DETECTED</div>'
-        else:
-            html += '<div style="color: #059669; font-size: 1.6rem; font-weight: 700; margin-bottom: 1.2rem; text-align: center; background: linear-gradient(135deg, #d1fae5, #a7f3d0); padding: 1rem; border-radius: 12px; border: 1px solid #a7f3d0;">LEGITIMATE SITE</div>'
-        
-        # Final Rationale
-        html += f"""
-        <div style="margin-bottom: 1.8rem;">
-            <h3 style="margin-bottom: 0.6rem; color: #374151; font-weight: 600; font-size: 1.3rem;">Analysis Rationale</h3>
-            <div style="
-                background: linear-gradient(135deg, #e0f2fe, #bae6fd);
-                padding: 1.2rem;
-                border-radius: 12px;
-                border-left: 4px solid #3b82f6;
-                box-shadow: 0 2px 4px -1px rgba(59, 130, 246, 0.1);
-            ">
-                {markdown.markdown(result["final_rationale"])}
-            </div>
-        </div>
-        """
+        # Analysis Rationale
+        st.markdown("#### Analysis Rationale")
+        with st.container():
+            st.markdown(
+                f'<div style="padding: 1.25rem; border-radius: 8px; background-color: #f8fafc; border: 1px solid #e5e7eb; margin-bottom: 1.5rem;">'
+                f'{sanitize_html(result["final_rationale"])}'
+                f'</div>',
+                unsafe_allow_html=True
+            )
         
         # Safety Instructions
-        html += f"""
-        <div>
-            <h3 style="margin-bottom: 0.6rem; color: #374151; font-weight: 600; font-size: 1.3rem;">Safety Instructions</h3>
-            <div style="
-                background: linear-gradient(135deg, #fffbeb, #fef3c7);
-                padding: 1.2rem;
-                border-radius: 12px;
-                border-left: 4px solid #f59e0b;
-                color: #92400e;
-                box-shadow: 0 2px 4px -1px rgba(245, 158, 11, 0.1);
-            ">
-                {markdown.markdown(result["safety_instructions"])}
-            </div>
-        </div>
-        """
-        
-        html += '</div>'
-        st.markdown(html, unsafe_allow_html=True)
+        st.markdown("#### Safety Instructions")
+        with st.container():
+            st.markdown(
+                f'<div style="padding: 1.25rem; border-radius: 8px; background-color: #fffbeb; border: 1px solid #fef3c7;">'
+                f'{sanitize_html(result["safety_instructions"])}'
+                f'</div>',
+                unsafe_allow_html=True
+            )
     
     with col2:
-        st.markdown("### Analysis Details")
+        st.markdown("#### Analysis Details")
         
-        if result.get("llm_risk_score") is not None:
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #f9fafb, #f3f4f6); padding: 1.2rem; border-radius: 12px; margin-bottom: 1.2rem; box-shadow: 0 4px 6px -1px rgba(107, 114, 128, 0.1);">
-                <p style="color: #374151; font-size: 0.95rem; margin-bottom: 0.6rem;"><strong>LLM Risk Score:</strong></p>
-                <p style="color: #4f46e5; font-size: 1.6rem; font-weight: 700; margin: 0;">{result["llm_risk_score"]}/100</p>
-            </div>
-            """, unsafe_allow_html=True)
+        # Metrics in clean cards
+        metrics_container = st.container()
+        with metrics_container:
+            if result.get("llm_risk_score") is not None:
+                st.metric(
+                    label="Risk Score",
+                    value=f"{result['llm_risk_score']}",
+                    help="0-100 scale, higher indicates more risk"
+                )
+            
+            if result.get("llm_phishing_prob") is not None:
+                prob_percentage = result["llm_phishing_prob"] * 100
+                st.metric(
+                    label="Phishing Probability",
+                    value=f"{prob_percentage:.1f}%",
+                    help="Likelihood this is a phishing site"
+                )
         
-        if result.get("llm_phishing_prob") is not None:
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #f9fafb, #f3f4f6); padding: 1.2rem; border-radius: 12px; margin-bottom: 1.2rem; box-shadow: 0 4px 6px -1px rgba(107, 114, 128, 0.1);">
-                <p style="color: #374151; font-size: 0.95rem; margin-bottom: 0.6rem;"><strong>LLM Phishing Probability:</strong></p>
-                <p style="color: #4f46e5; font-size: 1.6rem; font-weight: 700; margin: 0;">{result["llm_phishing_prob"]:.1%}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        st.divider()
         
+        # Analysis Type
         if result.get("used_retrieval"):
-            display_status_badge("info", "ENHANCED ANALYSIS")
-            st.markdown("""
-            <div style="background: linear-gradient(135deg, #e0f2fe, #bae6fd); padding: 1.2rem; border-radius: 12px; margin-top: 1.2rem; box-shadow: 0 2px 4px -1px rgba(59, 130, 246, 0.1);">
-                <p style="color: #1e40af; font-size: 0.95rem; margin: 0;">
-                    <strong>Enhanced Analysis:</strong> This assessment used additional context from page content or search results for higher accuracy.
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                '<div style="padding: 1rem; border-radius: 6px; background-color: #eff6ff; border: 1px solid #dbeafe; margin-bottom: 1rem;">'
+                '<p style="margin: 0; color: #1e40af; font-weight: 500;">Enhanced Analysis</p>'
+                '<p style="margin: 0.25rem 0 0 0; color: #3b82f6; font-size: 0.875rem;">Used additional context for higher accuracy</p>'
+                '</div>',
+                unsafe_allow_html=True
+            )
         else:
-            display_status_badge("info", "URL-ONLY ANALYSIS")
-            st.markdown("""
-            <div style="background: linear-gradient(135deg, #e0f2fe, #bae6fd); padding: 1.2rem; border-radius: 12px; margin-top: 1.2rem; box-shadow: 0 2px 4px -1px rgba(59, 130, 246, 0.1);">
-                <p style="color: #1e40af; font-size: 0.95rem; margin: 0;">
-                    <strong>URL Analysis:</strong> This assessment was based primarily on URL structure and patterns.
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                '<div style="padding: 1rem; border-radius: 6px; background-color: #eff6ff; border: 1px solid #dbeafe; margin-bottom: 1rem;">'
+                '<p style="margin: 0; color: #1e40af; font-weight: 500;">URL-Only Analysis</p>'
+                '<p style="margin: 0.25rem 0 0 0; color: #3b82f6; font-size: 0.875rem;">Based primarily on URL structure and patterns</p>'
+                '</div>',
+                unsafe_allow_html=True
+            )
         
+        # Error note if present
         if result.get("error"):
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #fef2f2, #fecaca); padding: 1.2rem; border-radius: 12px; margin-top: 1.2rem; box-shadow: 0 2px 4px -1px rgba(220, 38, 38, 0.1);">
-                <p style="color: #991b1b; font-size: 0.95rem; margin: 0;">
-                    <strong>Note:</strong> {result['error']}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="padding: 1rem; border-radius: 6px; background-color: #fef2f2; border: 1px solid #fecaca; margin-top: 1rem;">'
+                f'<p style="margin: 0; color: #991b1b; font-size: 0.875rem;"><strong>Note:</strong> {sanitize_html(result["error"])}</p>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
 
 def run_analysis_with_ui(url: str):
     """Run the analysis pipeline with UI updates."""
     
-    # Initialize sidebar for intermediate results
+    # Initialize sidebar
     with st.sidebar:
         st.markdown("### Analysis Steps")
-        st.markdown("---")
+        st.divider()
         
         progress_placeholder = st.empty()
         
         display_progress_bar(progress_placeholder, 0, 5, "Validating URL format...")
         
-
         if not analysis.is_valid_url(url):
             display_metric_card("URL Validation", "FAILED", "Invalid URL format", "error")
             hide_progress_bar(progress_placeholder)
@@ -340,7 +358,7 @@ def run_analysis_with_ui(url: str):
         
         display_metric_card("URL Validation", "PASSED", "Valid URL format detected", "success")
         time.sleep(0.5)
-        
+    
     with st.sidebar:
         display_progress_bar(progress_placeholder, 1, 5, "Running ML analysis...")
         ml_phish_prob, ml_conf, ml_error = analysis.run_ml_analysis(url)
@@ -360,7 +378,7 @@ def run_analysis_with_ui(url: str):
         )
         time.sleep(0.5)
     
-    #  2: Live Check
+    # Live Check
     with st.sidebar:
         display_progress_bar(progress_placeholder, 2, 5, "Checking if site is live...")
         is_live = analysis.is_page_live(url)
@@ -375,7 +393,7 @@ def run_analysis_with_ui(url: str):
         display_metric_card("Live Check", "LIVE", "Site is accessible", "success")
         time.sleep(0.5)
     
-    #  3: Initial LLM Analysis
+    # Initial LLM Analysis
     with st.sidebar:
         display_progress_bar(progress_placeholder, 3, 5, "Running initial AI analysis...")
         p1_data, p1_error = analysis.run_initial_llm_analysis(url, ml_phish_prob)
@@ -399,28 +417,26 @@ def run_analysis_with_ui(url: str):
         
         initial_risk_score = p1_data["risk_score"]
         certainty = p1_data["certainty"]
-        retrieve = p1_data["retrieve"] 
-
+        retrieve = p1_data["retrieve"]
         initial_rationale = p1_data["initial_rationale"]
         
         risk_status = "suspicious" if initial_risk_score >= 70 else ("warning" if initial_risk_score >= 30 else "success")
         display_metric_card(
             "Initial AI Risk",
             f"{initial_risk_score}/100",
-            initial_rationale,
+            "Initial risk assessment",
             risk_status
         )
         
         if retrieve != "none":
-            #  display text for the next step
             if retrieve == "pageContent":
                 next_step_text = "Retrieve Page Content"
             elif retrieve == "searchResults":
                 next_step_text = "Retrieve Search Results"
             elif retrieve == "both":
-                next_step_text = "Retrieve Both Page Content & Search"
+                next_step_text = "Retrieve Both"
             else:
-                next_step_text = "Unknown Retrieval Type"
+                next_step_text = "Unknown"
                 
             display_metric_card("Next Step", next_step_text, "Enhanced analysis needed", "info")
         else:
@@ -428,7 +444,7 @@ def run_analysis_with_ui(url: str):
         
         time.sleep(0.5)
     
-    # 4: Branch based on retrieval
+    # Branch based on retrieval
     if retrieve == "none":
         total_stages = 5
         current_stage = 4
@@ -449,16 +465,16 @@ def run_analysis_with_ui(url: str):
                 display_metric_card("Safety Analysis", "COMPLETE", "Guidance generated", "success")
     else:
         if retrieve == "both":
-            total_stages = 7  # URL, ML, Live, Initial AI, Page Content, Search Results, Enhanced AI
+            total_stages = 7
         else:
-            total_stages = 6  # URL, ML, Live, Initial AI, Retrieval, Enhanced AI
+            total_stages = 6
         
         current_stage = 4
         with st.sidebar:
             additional_content, retrieval_text, next_stage = retrieve_content_based_on_option(
                 retrieve, url, progress_placeholder, current_stage, total_stages
             )
-            print("---------------------",additional_content)
+            
             if "No additional data available." == additional_content:
                 display_metric_card("Retrieval", "NO DATA", "Could not retrieve additional context", "warning")
             else:
@@ -495,29 +511,57 @@ def run_analysis_with_ui(url: str):
     return result
 
 def main():
-    """Main Streamlit application."""
+    """Main Streamlit application with clean, professional design."""
+    
+    # Rate limiting setup
+    if 'request_count' not in st.session_state:
+        st.session_state.request_count = 0
+    if 'last_reset_time' not in st.session_state:
+        st.session_state.last_reset_time = time.time()
+    
+    # Reset counter every hour (3600 seconds)
+    if time.time() - st.session_state.last_reset_time > 1800:
+        st.session_state.request_count = 0
+        st.session_state.last_reset_time = time.time()
+    
+    MAX_REQUESTS = 10  # Limit to 5 analyses per hour
+    
+    # Check if limit reached
+    limit_reached = st.session_state.request_count >= MAX_REQUESTS
     
     # Header
-    st.markdown('<h1 class="main-header">PhishLLM Security Analyzer</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Advanced AI-powered phishing detection using URL analysis, ML patterns, and contextual intelligence</p>', unsafe_allow_html=True)
+    st.markdown("# PhishLM Security Analyzer")
+    st.markdown("Advanced AI-powered phishing detection using URL analysis, ML patterns, and contextual intelligence")
+    st.divider()
     
-    # URL Input
-    col1, col2 = st.columns([3, 1])
-    with col1:
+    # URL Input with proper vertical alignment
+    url_col, btn_col = st.columns([3, 1])
+    
+    with url_col:
         url = st.text_input(
             "Enter URL to analyze:",
-            placeholder="https://example.com  ",
-            help="Enter a complete URL starting with http:// or https://"
+            placeholder="https://example.com",
+            help="Enter a complete URL starting with http:// or https://",
+            label_visibility="collapsed",
+            disabled=limit_reached  # Disable input when limit reached
         )
     
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        analyze_button = st.button("Analyze URL", type="primary", use_container_width=True)
+    with btn_col:
+        analyze_button = st.button(
+            "Analyze", 
+            type="primary", 
+            use_container_width=True,
+            disabled=limit_reached  # Disable button when limit reached
+        )
+        
+        # Show request counter
+        if limit_reached:
+            st.caption(f"Limit: {st.session_state.request_count}/{MAX_REQUESTS}")
     
-    st.markdown("---")
+    st.divider()
     
     # Information section
-    with st.expander("How it works:"):
+    with st.expander("How it works", expanded=False):
         st.markdown("""
         1. **URL Validation** - Checks if the URL format and domain structure are valid
         2. **ML Analysis** - Uses machine learning to detect phishing patterns in URL structure
@@ -527,19 +571,21 @@ def main():
         6. **Final Assessment** - Combines all analysis for comprehensive security evaluation
         """)
     
+    # Analysis execution
     if analyze_button and url:
+        if limit_reached:
+            st.warning(f"Rate limit reached. You've used {st.session_state.request_count} out of {MAX_REQUESTS} analyses. Please try again in an hour.")
+            return
+        
+        # Increment counter for valid requests
+        st.session_state.request_count += 1
+        
         if not url.startswith(('http://', 'https://')):
             st.warning("Please enter a complete URL starting with http:// or https://")
             return
         
-        results_placeholder = st.empty()
-        
-        with results_placeholder.container():
-            st.info("Starting analysis... Please wait.")
-        
-        result = run_analysis_with_ui(url)
-        
-        results_placeholder.empty()
+        with st.spinner("Starting analysis..."):
+            result = run_analysis_with_ui(url)
         
         if result:
             display_final_result(result)
@@ -547,13 +593,10 @@ def main():
     elif analyze_button and not url:
         st.warning("Please enter a URL to analyze")
     
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; color: #6b7280; font-size: 0.9rem; margin-top: 3rem;">
-        <p>PhishLLM Analyzer • Professional Security Assessment Tool</p>
-        <p>Always exercise caution when visiting unfamiliar websites</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Footer
+    st.divider()
+    st.caption("PhishLM Analyzer • Professional Security Assessment Tool")
+    st.caption("Always exercise caution when visiting unfamiliar websites")
 
 if __name__ == "__main__":
     main()
