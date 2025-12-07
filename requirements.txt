@@ -6,7 +6,7 @@ scikit-learn
 catboost
 
 tldextract
-
+groq
 sentence-transformers 
 faiss-cpu
 
