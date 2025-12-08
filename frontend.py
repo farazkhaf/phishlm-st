@@ -153,7 +153,7 @@ st.markdown("""
     
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    
+    header {visibility: hidden;}
     .stProgress > div > div > div > div {
         background: linear-gradient(90deg, #6366f1, #8b5cf6);
     }
