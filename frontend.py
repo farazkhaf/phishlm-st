@@ -36,12 +36,12 @@ st.markdown("""
         }
         
         [data-testid="stSidebar"][aria-expanded="true"] {
-            transform: translateX(-92%);
+            transform: translateX(0%);
         }
             
         [data-testid="stSidebar"][aria-expanded="false"] {
             
-            transform: translateX(-100%);
+            transform: translateX(-94%);
         }
         
         .main .block-container {
