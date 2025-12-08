@@ -42,7 +42,9 @@ footer {visibility: hidden;}
 [data-testid="stProgress"] > div > div > div > div {
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
 }
-
+h1 {
+        color: var(--accent) !important;
+    }
 /* Primary button styles */
 button[kind="primary"] span {
   font-weight: 900 !important;
@@ -132,8 +134,6 @@ def update_sidebar_ui(placeholder):
     This ensures the previous content is completely replaced (cleared) 
     before writing the new state.
     """
-    # The 'with placeholder.container():' block completely overwrites 
-    # whatever was in the placeholder previously.
     with placeholder.container():
         st.markdown("### Analysis progress")
         
@@ -400,15 +400,12 @@ def risk_score_card(score: int):
 
     st.markdown(
         f"""
-        <div style="
-            
-        ">
             <h4 style="margin:0;">Risk Score</h4>
             <p style="margin-left: 15px; font-size:3em; font-weight:bold; color:{color};">
                 {score}/100
             </p>
             <small style="color:gray;">0 = Safe, 100 = High Risk</small>
-        </div>
+
         """,
         unsafe_allow_html=True
     )
