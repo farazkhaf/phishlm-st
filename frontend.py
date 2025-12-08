@@ -5,6 +5,7 @@ import analysis
 import tldextract
 import re
 
+
 st.set_page_config(
     page_title="PhishLM Analyzer",
     page_icon=None,
@@ -22,7 +23,7 @@ st.markdown("""
     
     @media (min-width: 769px) {
         [data-testid="stSidebar"] {
-            transform: translateX(0) !important;
+            transform: translateX(0) ;
         }
     }
     
@@ -30,13 +31,16 @@ st.markdown("""
         [data-testid="stSidebar"] {
             min-width: 100vw !important;
             max-width: 100vw !important;
-            transform: translateX(-100%);
             transition: transform 300ms ease-in-out;
             z-index: 999;
         }
         
         [data-testid="stSidebar"][aria-expanded="true"] {
             transform: translateX(0);
+        }
+            
+        [data-testid="stSidebar"][aria-expanded="false"] {
+            transform: translateX(-90%);
         }
         
         .main .block-container {
@@ -68,14 +72,14 @@ st.markdown("""
     .phishing-card {
         border-left: 4px solid #dc2626 !important;
         border-radius: 8px;
-        padding: 1.5rem;
+        padding: 1rem;
         margin-bottom: 2rem;
     }
     
     .legitimate-card {
         border-left: 4px solid #059669 !important;
         border-radius: 8px;
-        padding: 1.5rem;
+        padding: 1rem;
         margin-bottom: 2rem;
     }
     
@@ -149,7 +153,6 @@ st.markdown("""
     
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     
     .stProgress > div > div > div > div {
         background: linear-gradient(90deg, #6366f1, #8b5cf6);
@@ -268,14 +271,14 @@ def display_final_result(result: Dict[str, Any]):
     if result["prediction"] == "PHISHING":
         st.markdown(
             '<div class="phishing-card">'
-            '<h3 style="margin: 0;">PHISHING SITE DETECTED</h3>'
+            '<h2 style="margin: 0; color: #d61e1e;">Phishing</h3>'
             '</div>',
             unsafe_allow_html=True
         )
     else:
         st.markdown(
-            '<div class="legitimate-card">'
-            '<h3 style="margin: 0;">LEGITIMATE SITE</h3>'
+            '<div class="legitimate-card"'
+            '<h2 style="margin: 0; color: #18cc75;">Legitimate</h3>'
             '</div>',
             unsafe_allow_html=True
         )
@@ -390,7 +393,7 @@ def run_analysis_with_ui(url: str):
         is_live = analysis.is_page_live(url)
         
         if not is_live:
-            display_metric_card("Live Check", "OFFLINE", "Site not accessible", "warning")
+            display_metric_card("Live Check", "OFFLINE", "Site not live or accessible. Detailed analysis unavaiable.", "warning")
             hide_progress_bar(progress_placeholder)
             result = analysis.handle_non_live_url(ml_phish_prob, ml_conf)
             return result
@@ -517,6 +520,7 @@ def main():
         st.session_state.request_count = 0
     if 'last_reset_time' not in st.session_state:
         st.session_state.last_reset_time = time.time()
+
     
     if time.time() - st.session_state.last_reset_time > 1800:
         st.session_state.request_count = 0
@@ -568,6 +572,8 @@ def main():
         if limit_reached:
             st.warning(f"Rate limit reached. You've used {st.session_state.request_count} out of {MAX_REQUESTS} analyses. Please try again in an hour.")
             return
+        
+        st.session_state.sidebar_init = True
         
         st.session_state.request_count += 1
         
