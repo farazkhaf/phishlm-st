@@ -36,7 +36,7 @@ st.markdown("""
         }
         
         [data-testid="stSidebar"][aria-expanded="true"] {
-            transform: translateX(0);
+            transform: translateX(-30%);
         }
             
         [data-testid="stSidebar"][aria-expanded="false"] {
