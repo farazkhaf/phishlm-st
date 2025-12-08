@@ -31,16 +31,17 @@ st.markdown("""
         [data-testid="stSidebar"] {
             min-width: 100vw !important;
             max-width: 100vw !important;
-            transition: transform 300ms ease-in-out;
+            transition: transform 500ms ease-in-out;
             z-index: 999;
         }
         
         [data-testid="stSidebar"][aria-expanded="true"] {
-            transform: translateX(-30%);
+            transform: translateX(0%);
         }
             
         [data-testid="stSidebar"][aria-expanded="false"] {
-            transform: translateX(-90%);
+            transform: translateX(-50%);
+            transform: translateX(-100%);
         }
         
         .main .block-container {
