@@ -416,12 +416,16 @@ def display_final_result(result: Dict[str, Any]):
 
     # Determine score
     score = result.get("llm_risk_score", result.get("final_risk_score", None))
+    site_is_live = True
     if score is None:
         score = round(result.get("ml_phishing_prob", 0) * 100)
+        score = int(round(score * 0.3 + ((score + 50) / 2) * 0.7))
+        site_is_live = False
 
     # 1. RISK SCORE
     risk_score_card(score)
-
+    if not site_is_live:
+        st.markdown("**Site Not Live** URL is unreachable or offline. Assessment is limited.")
     st.divider()
 
     # 2. RATIONALE
