@@ -418,7 +418,7 @@ def display_final_result(result: Dict[str, Any]):
     score = result.get("llm_risk_score", result.get("final_risk_score", None))
     site_is_live = False
     if result.get("final_rationale") is not None:
-        if not result.get("final_rationale").startswith("Site is not live;")
+        if not result.get("final_rationale").startswith("Site is not live;"):
             site_is_live = True
     if not site_is_live:
         score = int(round(score * 0.3 + ((score + 50) / 2) * 0.7))
